@@ -4,13 +4,12 @@ module.exports = {
     createTableOrder: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `INSERT INTO Orders (created_at, created_by, payment_id, discount_id, total,  status_id, receiver_name, receiver_phone, receiver_address)
+                `INSERT INTO Orders (created_at, created_by, payment_id, total,  status_id, receiver_name, receiver_phone, receiver_address)
           VALUES (?, ?, ?, ?, ?, ?,?,?,?)`,
                 [
                     data.created_at,
                     data.created_by,
                     data.payment_id,
-                    data.discount_id,
                     data.total,
                     5,
                     data.receiver_name,
@@ -105,68 +104,7 @@ module.exports = {
             throw error;
         }
     },
-    getDiscountById: async (id) => {
-        try {
-            const [rows, fields] = await connection.execute(
-                `SELECT * FROM Discounts WHERE id = ?`,
-                [id]
-            );
 
-            return rows[0];
-        } catch (error) {
-            throw error;
-        }
-    },
-    getDiscounts: async () => {
-        try {
-            const [rows, fields] = await connection.execute(
-                `SELECT * FROM Discounts `,
-            );
-
-            return rows;
-        } catch (error) {
-            throw error;
-        }
-    },
-    updateDiscount: async (data) => {
-        try {
-            const [rows, fields] = await connection.execute(
-                `UPDATE Discounts
-                SET status_id = ?, \`condition\` = ?, maxGet = ?, modifield_time = ?
-                WHERE id = ?`,
-                [
-                    data.status_id,
-                    data.condition,
-                    data.maxGet,
-                    data.modifield_time,
-                    data.id
-                ]
-            );
-            return rows[0];
-        } catch (error) {
-            throw error;
-        }
-    },
-    createDiscount: async (data) => {
-        console.log(data)
-        try {
-            const [rows, fields] = await connection.execute(
-                `INSERT INTO Discounts
-                (status_id, \`condition\`, maxGet, modifield_time, id)
-                VALUES (?, ?, ?,?,?)`,
-                [
-                    data.status_id,
-                    data.condition,
-                    data.maxGet,
-                    data.modifield_time,
-                    data.id,
-                ]
-            );
-            return rows[0];
-        } catch (error) {
-            throw error;
-        }
-    },
     getOrderDetailById: async (id) => {
         try {
             const [rows, fields] = await connection.execute(

@@ -24,6 +24,8 @@ const {
   getImageByItemId,
   deleteImageByName,
   deleteItem,
+  getReviewByItemId,
+  updateReviewSlot,
 } = require("./item.service");
 const formidable = require("formidable");
 const moment = require("moment")
@@ -74,6 +76,7 @@ module.exports = {
       const body = fields;
       let images = []
       const imagesName = JSON.parse(body.imagesName)
+      const imagesUrl = JSON.parse(body.imagesUrl)
       for (const index in imagesName) {
         const filePath = findFilePathByFileName('C:/Users/Ky/Downloads', imagesName[index]);
         if (filePath) {
@@ -123,7 +126,8 @@ module.exports = {
         for (index in imageNames) {
           const temp = {
             name: imageNames[index],
-            item_id: itemID
+            item_id: itemID,
+            url: imagesUrl[index],
           }
           await createImage(temp)
         }
@@ -207,6 +211,7 @@ module.exports = {
       body.type_id = body.type_id.toString();
       body.imagesName = JSON.parse(body.imagesName);
       const imagesName = body.imagesName;
+      const imagesUrl = body.imagesUrl;
       let images = [];
       const existingImages = await getImageByItemId(id)
       for (const index in imagesName) {
@@ -245,7 +250,8 @@ module.exports = {
             }
             const temp = {
               name: imagesName[index],
-              item_id: id
+              item_id: id,
+              url: imagesUrl[index]
             }
             await createImage(temp)
             images.push(imagesName[index])
@@ -268,7 +274,13 @@ module.exports = {
       }
 
       try {
-
+        const test = await getItemByName(body.name)
+        if (test) {
+          return res.status(409).json({
+            success: 0,
+            message: "Item with the same name already exists"
+          });
+        }
 
         await updateItem(id, body);
 
@@ -526,5 +538,51 @@ module.exports = {
         data: 'Something wrong'
       });
     }
+  },
+  updateReview: async (req, res) => {
+    const form = new formidable.IncomingForm();
+    form.parse(req, async (err, fields, files) => {
+      if (err) {
+        console.error(err);
+        return res.status(500).json({
+          success: 0,
+          message: "Error parsing form data"
+        });
+      }
+
+      const id = req.params.id;
+      const body = fields;
+      const role = req.decoded.role;
+      const userId = req.decoded.userId;
+      const review = await getReviewByItemId()
+      body.rating = body.name.toString();
+      body.text = body.description.toString();
+
+      const data = {
+        id: id,
+        name: body.name,
+        description: body.description,
+        guide: body.guide,
+        type_id: body.type_id
+      }
+      if (review.created_by == userId) {
+        try {
+          const result = await updateReviewSlot(data);
+
+          return res.json({
+            success: 1,
+            message: "Updated successfully"
+          });
+        } catch (error) {
+          // console.error(error);
+          return res.status(500).json({
+            success: 0,
+            message: "Something went wrong"
+          });
+        }
+      }
+
+    });
+
   },
 };

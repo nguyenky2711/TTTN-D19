@@ -30,7 +30,7 @@ module.exports = {
                 [id]
             );
             const [rows2, fields2] = await connection.execute(
-                `SELECT price FROM Prices WHERE product_id = ?`,
+                `SELECT price, discounted_price FROM Prices WHERE product_id = ? and status_id=1`,
                 [rows[0].id]
             );
             const [rows3, fields3] = await connection.execute(
@@ -115,7 +115,6 @@ module.exports = {
                 stockDTO: rows3,
                 priceDTO: rows2
             }
-            console.log(data)
             return data;
         } catch (error) {
             throw error;
@@ -183,21 +182,24 @@ module.exports = {
                 `SELECT * FROM Prices WHERE product_id = ?`,
                 [product_id]
             );
-            return rows;
+            return rows[rows.length - 1];
         } catch (error) {
             throw error;
         }
     },
+
     createPriceItem: async (data) => {
         console.log(data)
         try {
             const [rows, fields] = await connection.execute(
-                `INSERT INTO Prices (product_id, price, modifield_time)
-          VALUES (?,?,?)`,
+                `INSERT INTO Prices (product_id, price, modifield_time,discounted_price, status_id)
+          VALUES (?,?,?,?,?)`,
                 [
                     data.product_id,
                     data.price,
                     data.modifield_time,
+                    data.discounted_price,
+                    1,
                 ]
             );
 
@@ -215,10 +217,12 @@ module.exports = {
     updatePriceByProductId: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `update Prices set price=?, modifield_time=> where product_id=?`,
+                `update Prices set price=?, modifield_time=?, discounted_price=?, status_id=? where product_id=?`,
                 [
                     data.price,
                     data.modifield_time,
+                    data.discounted_price,
+                    data.status_id,
                     data.product_id,
                 ]);
             if (rows.affectedRows === 0) {
@@ -266,14 +270,17 @@ module.exports = {
     updatePriceByProductId: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `update Prices set price=?, modifield_time=? where product_id=?`,
+                `update Prices set price=?, modifield_time=?, status_id=?, discounted_price=? where product_id=? and id =?`,
                 [
                     data.price,
                     data.modifield_time,
+                    data.status_id,
+                    data.discounted_price,
                     data.product_id,
+                    data.id,
                 ]);
             if (rows.affectedRows === 0) {
-                throw new Error('Image item not found');
+                throw new Error('Price item not found');
             }
 
             return rows[0]
@@ -325,5 +332,95 @@ module.exports = {
             throw error;
         }
     },
+    getDiscountById: async (id) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Discounts WHERE id = ?`,
+                [id]
+            );
+
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    getDiscountByItemId: async (id) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Discounts WHERE item_id = ?`,
+                [id]
+            );
+
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    getDiscounts: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Discounts `,
+            );
+
+            return rows;
+        } catch (error) {
+            throw error;
+        }
+    },
+    updateDiscount: async (data) => {
+        console.log(data)
+        try {
+            const [rows, fields] = await connection.execute(
+                `UPDATE Discounts
+                SET status_id = ?, modifield_time = ?, startDate = ?, endDate = ?, percentDiscount = ?, item_id = ?
+                WHERE id = ?`,
+                [
+                    data.status_id,
+                    data.modifield_time,
+                    data.startDate,
+                    data.endDate,
+                    data.percentDiscount,
+                    data.item_id,
+                    data.id
+                ]
+            );
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    createDiscount: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `INSERT INTO Discounts
+                (status_id, modifield_time, startDate, endDate, percentDiscount, item_id, id)
+                VALUES (?, ?, ?, ?, ?, ?,?)`,
+                [
+                    1,
+                    data.modifield_time,
+                    data.startDate,
+                    data.endDate,
+                    data.percentDiscount,
+                    data.item_id,
+                    data.id,
+                ]
+            );
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    getPrices: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Prices`
+            )
+            return rows;
+
+        } catch (error) {
+            throw error;
+
+        }
+    }
     // createImport
 };
