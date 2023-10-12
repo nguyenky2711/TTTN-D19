@@ -5,7 +5,7 @@ const {
 const formidable = require("formidable");
 const connection = require("../../config/database");
 const moment = require("moment");
-const { getStatusDTO, updateProduct } = require('../items/item.service');
+const { getStatusDTO, updateProduct, getItemById, createReviewSlot, getReviews } = require('../items/item.service');
 const { updateStatusCart, deleteProduct } = require('../carts/cart.service');
 const { getStockByProductId, getProductById, getProductByItemId } = require('../products/product.service');
 module.exports = {
@@ -26,7 +26,7 @@ module.exports = {
                 created_at,
                 created_by,
                 payment_id: isNaN(body.payment_id.toString()) ? null : parseInt(body.payment_id.toString()),
-                discount_id: isNaN(body.discount_id.toString()) ? null : parseInt(body.discount_id.toString()),
+                // discount_id: isNaN(body.discount_id.toString()) ? null : parseInt(body.discount_id.toString()),
                 total: parseFloat(body.total.toString()),
                 receiver_name: body.receiver_name.toString(),
                 receiver_phone: body.receiver_phone.toString(),
@@ -103,9 +103,10 @@ module.exports = {
                 const result = await getOrders(statusId);
                 let newResult = []
                 for (index in result) {
-                    const { payment_id, discount_id, status_id, created_by, ...resultData } = result[index];
+                    // const { payment_id, discount_id, status_id, created_by, ...resultData } = result[index];
+                    const { payment_id, status_id, created_by, ...resultData } = result[index];
                     const paymentDTO = await getPaymentById(payment_id);
-                    const discountDTO = await getDiscountById(discount_id);
+                    // const discountDTO = await getDiscountById(discount_id);
                     const statusDTO = await getStatusDTO(status_id);
                     const order_detailDTO = await getOrderDetailById(result[index].id);
                     const creatorDTO = await getUserByUserId(created_by)
@@ -114,7 +115,7 @@ module.exports = {
                         order_detailDTO: order_detailDTO,
                         statusDTO: statusDTO,
                         paymentDTO: paymentDTO,
-                        discountDTO: discountDTO,
+                        // discountDTO: discountDTO,
                         creatorDTO: creatorDTO
                     }
                     newResult.push(tempObject);
@@ -144,9 +145,10 @@ module.exports = {
                 const result = await getOrdersByUser(userId, statusId);
                 let newResult = []
                 for (index in result) {
-                    const { payment_id, discount_id, status_id, created_by, created_at, ...resultData } = result[index];
+                    // const { payment_id, discount_id, status_id, created_by, created_at, ...resultData } = result[index];
+                    const { payment_id, status_id, created_by, created_at, ...resultData } = result[index];
                     const paymentDTO = await getPaymentById(payment_id);
-                    const discountDTO = await getDiscountById(discount_id);
+                    // const discountDTO = await getDiscountById(discount_id);
                     const statusDTO = await getStatusDTO(status_id);
                     const order_detailDTO = await getOrderDetailById(result[index].id);
                     const newTime = moment(new Date(created_at)).format('yyyy-MM-DD');
@@ -166,7 +168,7 @@ module.exports = {
                         order_detailDTO: order_detailDTO,
                         statusDTO: statusDTO,
                         paymentDTO: paymentDTO,
-                        discountDTO: discountDTO,
+                        // discountDTO: discountDTO,
                         created_at: newTime
                     }
                     // console.log(tempObject)
@@ -202,9 +204,10 @@ module.exports = {
             const result = await getOrdersByUser(userId);
             let newResult = []
             for (index in result) {
-                const { payment_id, discount_id, status_id, created_by, ...resultData } = result[index];
+                // const { payment_id, discount_id, status_id, created_by, ...resultData } = result[index];
+                const { payment_id, status_id, created_by, ...resultData } = result[index];
                 const paymentDTO = await getPaymentById(payment_id);
-                const discountDTO = await getDiscountById(discount_id);
+                // const discountDTO = await getDiscountById(discount_id);
                 const statusDTO = await getStatusDTO(status_id);
                 const order_detailDTO = await getOrderDetailById(result[index].id);
                 // let order_detailDTO = []
@@ -223,7 +226,7 @@ module.exports = {
                     order_detailDTO: order_detailDTO,
                     statusDTO: statusDTO,
                     paymentDTO: paymentDTO,
-                    discountDTO: discountDTO,
+                    // discountDTO: discountDTO,
                 }
                 newResult.push(tempObject);
             }
@@ -336,6 +339,41 @@ module.exports = {
                     await returnProductStock(order_detail[index].id)
                 }
             }
+            // add review slot
+            if (result !== undefined && statusId === 9) {
+                // Define an async function to use 'await'
+                async function processOrderDetail() {
+                    const uniqueProducts = [];
+
+                    await Promise.all(order_detail.map(async (item) => {
+                        const product = await getProductById(item.product_id);
+                        const existingProduct = uniqueProducts.find((r) => r.item_id === product.item_id);
+
+                        if (!existingProduct) {
+                            uniqueProducts.push(product);
+                        }
+                    }));
+
+                    return uniqueProducts;
+                }
+
+                // Call the async function and await the result
+                const reviews = await getReviews()
+                const uniqueProducts = await processOrderDetail();
+                for (const uniqueProduct of uniqueProducts) {
+                    const sendData = {
+                        created_by: order.created_by,
+                        modifield_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                        id: reviews.length,
+                        item_id: uniqueProduct.item_id,
+                    }
+                    await createReviewSlot(sendData)
+                }
+
+
+                // Now you can use 'uniqueProducts' here.
+            }
+
             res.json({
                 success: 1,
                 message: "Status updated successfully"
@@ -378,173 +416,10 @@ module.exports = {
         } catch (error) {
             // Handle any errors that occurred during fetching payments
             console.error('Error fetching payments:', error);
-            return res.status(500).json({ success: 0, error: 'Failed to get discounts' });
+            return res.status(500).json({ success: 0, error: 'Failed to get payments' });
         }
     },
-    getDiscounts: async (req, res) => {
 
-        const no = req.query.no ? Number(req.query.no) : 0
-        const limit = req.query.limit ? Number(req.query.limit) : 100
-        try {
-            const discounts = await getDiscounts(); // Assuming getPayments is an asynchronous function that fetches payments data
-            let result = []
-            for (index in discounts) {
-                const { status_id, ...rest } = discounts[index]
-                if (status_id == 1) {
-                    const statusDTO = await getStatusDTO(status_id)
-                    const temp = {
-                        ...rest,
-                        statusDTO: statusDTO
-                    }
-                    result.push(temp)
-                }
-            }
-            result = result.reverse()
-            const totalPages = Math.ceil(result.length / limit);
-            const startIndex = no * limit;
-            const endIndex = startIndex + limit;
-            const paginatedData = result.slice(startIndex, endIndex);
-            // Assuming you want to send the payments data as the response
-            return res.json({
-                success: 1,
-                totalPages: totalPages,
-                totalItem: result.length,
-                no: no,
-                limit: limit,
-                data: paginatedData
-            })
-        } catch (error) {
-            // Handle any errors that occurred during fetching payments
-            console.error('Error fetching payments:', error);
-            res.status(500).json({ success: 0, error: 'Failed to get discounts' });
-        }
-    },
-    getDiscountById: async (req, res) => {
-        const id = req.params.id
-        try {
-            const discounts = await getDiscountById(id);
-            const { status_id, ...rest } = discounts
-            const statusDTO = await getStatusDTO(status_id)
-            const temp = {
-                ...rest,
-                statusDTO: statusDTO
-            }
-
-            // Assuming you want to send the payments data as the response
-            return res.status(200).json({ success: 1, data: temp });
-        } catch (error) {
-            // Handle any errors that occurred during fetching payments
-            console.error('Error fetching payments:', error);
-            return res.status(500).json({ success: 0, error: 'Failed to get discounts' });
-        }
-    },
-    updateDiscount: async (req, res) => {
-        const form = new formidable.IncomingForm();
-        form.parse(req, async (err, fields, files) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({
-                    success: 0,
-                    message: "Error parsing form data"
-                });
-            }
-            const body = fields;
-            const currentData = await getDiscountById(Number(req.params.id))
-            if (currentData.condition == Number(body.condition.toString()) && currentData.maxGet == Number(body.maxGet.toString())) {
-                // console.log(1)
-                const sendData = {
-                    id: Number(req.params.id),
-                    condition: Number(body.condition.toString()),
-                    maxGet: Number(body.maxGet.toString()),
-                    status_id: parseInt(body.status_id.toString()),
-                    modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }
-                try {
-                    const result = await updateDiscount(sendData)
-                    return res.status(200).json({
-                        success: 1,
-                        message: "Update successfully",
-
-                    });
-                } catch (error) {
-                    console.error(error);
-                    return res.status(500).json({
-                        success: 0,
-                        message: "Database connection error"
-                    });
-                }
-            } else if (currentData.condition != Number(body.condition.toString()) || currentData.maxGet != Number(body.maxGet.toString())) {
-                // console.log(2)
-                const listDiscount = await getDiscounts()
-                const sendOldData = {
-                    id: Number(req.params.id),
-                    condition: Number(body.condition.toString()),
-                    maxGet: Number(body.maxGet.toString()),
-                    status_id: 2,
-                    modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }
-                const sendNewData = {
-                    id: (listDiscount.length + 1),
-                    condition: Number(body.condition.toString()),
-                    maxGet: Number(body.maxGet.toString()),
-                    status_id: parseInt(body.status_id.toString()),
-                    modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
-                }
-                try {
-                    const updateResult = await updateDiscount(sendOldData)
-                    const createResult = await createDiscount(sendNewData)
-                    return res.status(200).json({
-                        success: 1,
-                        message: "Update successfully",
-
-                    });
-                } catch (error) {
-                    console.error(error);
-                    return res.status(500).json({
-                        success: 0,
-                        message: "Database connection error"
-                    });
-                }
-            }
-
-        });
-    },
-    createDiscount: async (req, res) => {
-        const form = new formidable.IncomingForm();
-        form.parse(req, async (err, fields, files) => {
-            if (err) {
-                console.error(err);
-                return res.status(500).json({
-                    success: 0,
-                    message: "Error parsing form data"
-                });
-            }
-            const body = fields;
-            const discounts = await getDiscounts();
-            const sendData = {
-                condition: Number(body.condition.toString()),
-                maxGet: Number(body.maxGet.toString()),
-                status_id: 1,
-                id: discounts.length + 1,
-                modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
-            }
-
-            try {
-                const result = await createDiscount(sendData)
-                return res.status(200).json({
-                    success: 1,
-                    message: "Create discount successfully",
-
-                });
-            } catch (error) {
-                console.error(error);
-                return res.status(500).json({
-                    success: 0,
-                    message: "Database connection error"
-                });
-            }
-        });
-    },
     statisticOrdersByTime: async (req, res) => {
         const role = req.decoded.role;
         if (role == 'admin') {

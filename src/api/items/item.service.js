@@ -77,11 +77,12 @@ module.exports = {
     createImage: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `INSERT INTO Images (name, item_id)
-          VALUES (?, ?)`,
+                `INSERT INTO Images (name, item_id, url)
+          VALUES (?, ?,?)`,
                 [
                     data.name,
                     data.item_id,
+                    data.url,
                 ]
             );
 
@@ -403,6 +404,93 @@ module.exports = {
             }
 
             return rows
+        } catch (error) {
+            throw error;
+        }
+    },
+    getReviews: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Review`,
+                [item_id]
+            );
+
+            return rows;
+        } catch (error) {
+            throw error;
+        }
+    },
+    getReviewById: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Review  where id=?`,
+                [data]
+            );
+
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    getReviewByItemId: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Review  where item_id=?`,
+                [data]
+            );
+
+            return rows;
+        } catch (error) {
+            throw error;
+        }
+    },
+    createReviewSlot: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `INSERT INTO Review (id, item_id, created_by, rating, text, modifield_time, like, dislike, purchased)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    data.id,
+                    data.item_id,
+                    data.created_by,
+                    null,
+                    null,
+                    data.modifield_time,
+                    0,
+                    0,
+                    1,
+
+                ]
+            );
+            // Check if the insert operation was successful
+            if (rows.affectedRows === 1) {
+                return rows.insertId // Return the inserted ID
+            } else {
+                throw new Error("Failed to insert revie slot");
+            }
+        } catch (error) {
+            throw error;
+        }
+    },
+    updateReviewSlot: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `update Review set  created_by=?, rating=?, text=?, modifield_time=?, like=?, dislike=?, purchased=? where id=? and product_id=?`,
+                [
+                    data.created_by,
+                    data.rating,
+                    data.text,
+                    data.modifield_time,
+                    data.like,
+                    data.dislike,
+                    data.purchased,
+                    data.id,
+                    data.product_id,
+                ]);
+            if (rows.affectedRows === 0) {
+                throw new Error('Item not found');
+            }
+            return rows[0]
         } catch (error) {
             throw error;
         }

@@ -2,7 +2,7 @@ require('dotenv').config();
 const formidable = require("formidable");
 const moment = require("moment");
 const { getStatusDTO, getItemByName, createItem, createImage, getSizeByInfo, getItems, activeStatusItem } = require('../items/item.service');
-const { getProducts, getProductById, createProduct, getProductByItemId, getProductDTOByItemId, getProductByItemSizeId, createImport, updateInventoryByProductId, createImportDetail, getPriceByProductId, createPriceItem, createInventoryItem, updatePriceByProductId } = require('./product.service');
+const { getProducts, getProductById, createProduct, getProductByItemId, getProductDTOByItemId, getProductByItemSizeId, createImport, updateInventoryByProductId, createImportDetail, getPriceByProductId, createPriceItem, createInventoryItem, updatePriceByProductId, updateDiscount, createDiscount, getDiscountById, getDiscountByItemId, getDiscounts, getPrices } = require('./product.service');
 const path = require('path');
 const fs = require('fs');
 const { createSize, updateSize } = require('../sizes/size.service');
@@ -88,7 +88,6 @@ module.exports = {
                 const temp = await getProductDTOByItemId(result[index]);
                 resultDT0.push(temp)
             }
-            console.log(resultDT0)
             return res.json({
                 success: 1,
                 productDTO: resultDT0
@@ -108,7 +107,38 @@ module.exports = {
         const no = req.query.no ? Number(req.query.no) : 0
         const limit = req.query.limit ? Number(req.query.limit) : 100
         try {
+            // scan price exprire
+            const discounts = await getDiscounts()
+            const prices = await getPrices()
+            for (const discount of discounts) {
+                if (discount.status_id == 1) {
+                    if (new Date(discount.startDate) <= new Date() && new Date(discount.endDate) >= new Date()) {
+                        const products = await getProductByItemId(parseInt(discount.item_id))
+                        for (const product of products) {
+                            const price = await getPriceByProductId(product.id);
+                            if (price.price == price.discounted_price) {
+                                const discounted_price = price.price * (1 - Number(discount.percentDiscount) / 100);
+                                const newPrice = { ...price, discounted_price };
+                                await createPriceItem(newPrice);
+                                await updatePriceByProductId({ ...price, status_id: 2 });
+                            }
+                        }
+                    }
+                    if (new Date(discount.endDate) <= new Date()) {
+                        const products = await getProductByItemId(parseInt(discount.item_id))
+                        for (const product of products) {
+                            const price = await getPriceByProductId(product.id);
+                            const discounted_price = price.price;
+                            const newPrice = { ...price, discounted_price };
+                            await createPriceItem(newPrice);
+                            await updatePriceByProductId({ ...price, status_id: 2 });
 
+                        }
+                    }
+                }
+
+            }
+            // get list product
             const result = await getProducts();
             var dataa = []
             for (index in result) {
@@ -421,13 +451,15 @@ module.exports = {
                                     const newPriceObj = {
                                         product_id: existProduct.id,
                                         price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
-                                        modifield_time: moment().format('YYYY-MM-DD HH:mm:SS')
+                                        modifield_time: moment().format('YYYY-MM-DD HH:mm:SS'),
+                                        discounted_price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                     }
                                     const result = await createPriceItem(newPriceObj)
                                 }
                                 if (listPrice[listPrice.length - 1].price != Number(imports[index].insideRows[index2].raw_price) * 1.3) {
                                     const newPriceObj = {
                                         product_id: existProduct.id,
+                                        discounted_price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                         price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                         modifield_time: moment().format('YYYY-MM-DD HH:mm:SS')
                                     }
@@ -453,6 +485,7 @@ module.exports = {
                                 await createInventoryItem(stockObj)
                                 const newPriceObj = {
                                     product_id: productId,
+                                    discounted_price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                     price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                     modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
                                 }
@@ -487,6 +520,7 @@ module.exports = {
                             await createInventoryItem(stockObj)
                             const newPriceObj = {
                                 product_id: productId,
+                                discounted_price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                 price: Number(imports[index].insideRows[index2].raw_price) * 1.3,
                                 modifield_time: moment().format('YYYY-MM-DD HH:mm:ss')
                             }
@@ -511,5 +545,301 @@ module.exports = {
             }
         });
 
+    },
+    getDiscounts: async (req, res) => {
+        const no = req.query.no ? Number(req.query.no) : 0
+        const limit = req.query.limit ? Number(req.query.limit) : 100
+        try {
+            const discounts = await getDiscounts(); // Assuming getPayments is an asynchronous function that fetches payments data
+            let result = []
+            for (index in discounts) {
+                const { status_id, ...rest } = discounts[index]
+                if (status_id == 1) {
+                    const statusDTO = await getStatusDTO(status_id)
+                    const temp = {
+                        ...rest,
+                        statusDTO: statusDTO
+                    }
+                    result.push(temp)
+                }
+            }
+            result = result.reverse()
+            const totalPages = Math.ceil(result.length / limit);
+            const startIndex = no * limit;
+            const endIndex = startIndex + limit;
+            const paginatedData = result.slice(startIndex, endIndex);
+            // Assuming you want to send the payments data as the response
+            return res.json({
+                success: 1,
+                totalPages: totalPages,
+                totalItem: result.length,
+                no: no,
+                limit: limit,
+                data: paginatedData
+            })
+        } catch (error) {
+            // Handle any errors that occurred during fetching payments
+            console.error('Error fetching payments:', error);
+            res.status(500).json({ success: 0, error: 'Failed to get discounts' });
+        }
+    },
+    getDiscountById: async (req, res) => {
+        const id = req.params.id
+        try {
+            const discounts = await getDiscountById(id);
+            const { status_id, ...rest } = discounts
+            const statusDTO = await getStatusDTO(status_id)
+            const temp = {
+                ...rest,
+                statusDTO: statusDTO
+            }
+
+            // Assuming you want to send the payments data as the response
+            return res.status(200).json({ success: 1, data: temp });
+        } catch (error) {
+            // Handle any errors that occurred during fetching payments
+            console.error('Error fetching payments:', error);
+            return res.status(500).json({ success: 0, error: 'Failed to get discount' });
+        }
+    },
+    getDiscountByItemId: async (req, res) => {
+        const itemId = req.query.itemId
+        try {
+            const discounts = await getDiscountByItemId(itemId);
+            const { status_id, ...rest } = discounts
+            const statusDTO = await getStatusDTO(status_id)
+            const temp = {
+                ...rest,
+                statusDTO: statusDTO
+            }
+
+            // Assuming you want to send the payments data as the response
+            return res.status(200).json({ success: 1, data: temp });
+        } catch (error) {
+            // Handle any errors that occurred during fetching payments
+            console.error('Error fetching payments:', error);
+            return res.status(500).json({ success: 0, error: 'Failed to get discount' });
+        }
+    },
+    updateDiscount: async (req, res) => {
+        const form = new formidable.IncomingForm();
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({
+                    success: 0,
+                    message: "Error parsing form data"
+                });
+            }
+            const body = fields;
+            const currentData = await getDiscountById(Number(req.params.id))
+            const sendData = {
+                id: Number(req.params.id),
+                percentDiscount: Number(body.percentDiscount.toString()),
+                status_id: parseInt(body.status_id.toString()),
+                item_id: parseInt(body.item_id.toString()),
+                modifield_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                startDate: body.startDate.toString(),
+                endDate: body.endDate.toString(),
+            }
+            const products = await getProductByItemId(sendData.item_id)
+
+            if (sendData.status_id == 10) { ///delete
+                try {
+                    for (const product of products) {
+                        const price = await getPriceByProductId(product.id);
+                        const discounted_price = price.price;
+                        const newPrice = { ...price, discounted_price };
+                        await createPriceItem(newPrice);
+                        await updatePriceByProductId({ ...price, status_id: 2 });
+                    }
+                    const result = await updateDiscount(sendData)
+
+                    return res.status(200).json({
+                        success: 1,
+                        message: "Update successfully",
+
+                    });
+                } catch (error) {
+                    console.error(error);
+                    return res.status(500).json({
+                        success: 0,
+                        message: "Database connection error"
+                    });
+                }
+            } else { //update
+                if (currentData.status_id == 2) { //disable
+                    if (new Date(sendData.startDate) <= new Date() && new Date(sendData.endDate) >= new Date()) {
+
+                        try {
+                            for (const product of products) {
+                                const price = await getPriceByProductId(product.id);
+                                const discounted_price = price.price * (1 - Number(body.percentDiscount.toString()) / 100);
+                                const newPrice = { ...price, discounted_price };
+                                await createPriceItem(newPrice);
+                                await updatePriceByProductId({ ...price, status_id: 2 });
+                            }
+                            const result = await createDiscount(sendData)
+                            return res.status(200).json({
+                                success: 1,
+                                message: "Update successfully",
+
+                            });
+                        } catch (error) {
+                            console.error(error);
+                            return res.status(500).json({
+                                success: 0,
+                                message: "Database connection error"
+                            });
+                        }
+                    }
+                    if (new Date(sendData.startDate) > new Date()) {
+                        try {
+
+                            const result = await createDiscount(sendData)
+                            return res.status(200).json({
+                                success: 1,
+                                message: "Update successfully",
+
+                            });
+                        } catch (error) {
+                            console.error(error);
+                            return res.status(500).json({
+                                success: 0,
+                                message: "Database connection error"
+                            });
+                        }
+                    }
+
+                } else { //active
+                    console.log(123)
+                    if (currentData.percentDiscount == Number(body.percentDiscount.toString())) {
+                        if (new Date(sendData.startDate) <= new Date() && new Date(sendData.endDate) >= new Date()) {
+
+                            try {
+
+                                const result = await updateDiscount(sendData)
+                                return res.status(200).json({
+                                    success: 1,
+                                    message: "Update successfully",
+
+                                });
+                            } catch (error) {
+                                console.error(error);
+                                return res.status(500).json({
+                                    success: 0,
+                                    message: "Database connection error"
+                                });
+                            }
+                        }
+                        if (new Date(sendData.startDate) > new Date()) {
+                            try {
+                                for (const product of products) {
+                                    const price = await getPriceByProductId(product.id);
+                                    const discounted_price = price.price;
+                                    const newPrice = { ...price, discounted_price };
+                                    await createPriceItem(newPrice);
+                                    await updatePriceByProductId({ ...price, status_id: 2 });
+                                }
+
+                                const result = await updateDiscount(sendData)
+                                return res.status(200).json({
+                                    success: 1,
+                                    message: "Update successfully",
+
+                                });
+                            } catch (error) {
+                                console.error(error);
+                                return res.status(500).json({
+                                    success: 0,
+                                    message: "Database connection error"
+                                });
+                            }
+                        }
+                    } else {
+                        if (new Date(sendData.startDate) <= new Date() && new Date(sendData.endDate) >= new Date()) {
+
+                            try {
+                                for (const product of products) {
+                                    const price = await getPriceByProductId(product.id);
+                                    const discounted_price = price.price * (1 - Number(body.percentDiscount.toString()) / 100);
+                                    const newPrice = { ...price, discounted_price };
+                                    await createPriceItem(newPrice);
+                                    await updatePriceByProductId({ ...price, status_id: 2 });
+                                }
+
+                                const result = await updateDiscount(sendData)
+                                return res.status(200).json({
+                                    success: 1,
+                                    message: "Update successfully",
+
+                                });
+                            } catch (error) {
+                                console.error(error);
+                                return res.status(500).json({
+                                    success: 0,
+                                    message: "Database connection error"
+                                });
+                            }
+                        }
+                    }
+                }
+
+            }
+
+
+        });
+    },
+    createDiscount: async (req, res) => {
+        const form = new formidable.IncomingForm();
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({
+                    success: 0,
+                    message: "Error parsing form data"
+                });
+            }
+            const body = fields;
+            console.log(body)
+            const discounts = await getDiscounts();
+            const products = await getProductByItemId(parseInt(body.item_id.toString()))
+            const sendData = {
+                percentDiscount: Number(body.percentDiscount.toString()),
+                item_id: parseInt(body.item_id.toString()),
+                modifield_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                // startDate: body.startDate.toString().moment().format('YYYY-MM-DD'),
+                // endDate: body.endDate.toString().moment().format('YYYY-MM-DD'),
+                startDate: body.startDate.toString(),
+                endDate: body.endDate.toString(),
+                status_id: 1,
+                id: discounts.length + 1,
+            }
+            try {
+                if (new Date(sendData.startDate) <= new Date() && new Date(sendData.endDate) >= new Date()) {
+
+                    for (const product of products) {
+                        const price = await getPriceByProductId(product.id);
+                        const discounted_price = price.price * (1 - Number(body.percentDiscount.toString()) / 100);
+                        const newPrice = { ...price, discounted_price };
+                        await createPriceItem(newPrice);
+                        await updatePriceByProductId({ ...price, status_id: 2 });
+                    }
+                }
+
+                const result = await createDiscount(sendData)
+                return res.status(200).json({
+                    success: 1,
+                    message: "Create discount successfully",
+
+                });
+            } catch (error) {
+                console.error(error);
+                return res.status(500).json({
+                    success: 0,
+                    message: "Database connection error"
+                });
+            }
+        });
     },
 }
