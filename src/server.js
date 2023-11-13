@@ -24,7 +24,7 @@ const host = process.env.HOST
 
 //config req.body
 app.use(express.json()) //for json
-app.use(express.urlencoded({ extended: true })) //for form data
+app.use(express.urlencoded({ extended: true, limit: '25mb' })) //for form data
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');

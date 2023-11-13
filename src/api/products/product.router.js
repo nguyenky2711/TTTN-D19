@@ -1,12 +1,15 @@
 const router = require("express").Router();
 const { checkToken } = require("../../auth/token_validation");
-const { getProducts, getProductById, createProduct, getProductByItemId, createImport, getProductsForImport, updateSize, updatePrice, createDiscount, updateDiscount, getDiscounts, getDiscountById } = require("./product.controller");
+const { getProducts, getProductById, createProduct, getProductByItemId, createImport, getProductsForImport, updateSize, updatePrice, createDiscount, updateDiscount, getDiscounts, getDiscountById, createLike, createDislike, getReviewsByItemId, } = require("./product.controller");
 router.get("/", getProducts);
 router.get("/import", getProductsForImport);
 router.get("/discount", checkToken, getDiscounts);
 
 router.get("/:id", getProductById);
 router.get("/items/:id", getProductByItemId);
+router.get("/item/review", getReviewsByItemId);
+router.post("/items/like", checkToken, createLike);
+router.post("/items/dislike", checkToken, createDislike);
 router.get("/discount/:id", getDiscountById);
 router.post("/", checkToken, createProduct);
 router.post("/import", checkToken, createImport);

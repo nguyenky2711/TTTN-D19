@@ -1,5 +1,5 @@
 
-
+const errorCodes = require('../errorMessages');
 const { verify } = require("jsonwebtoken");
 require('dotenv').config();
 module.exports = {
@@ -8,7 +8,7 @@ module.exports = {
     if (!token) {
       return res.status(401).json({
         success: 0,
-        message: "Access Denied! Unauthorized User",
+        message: errorCodes.UNAUTHORIZED_USER,
       });
     }
 
@@ -22,7 +22,7 @@ module.exports = {
     } catch (error) {
       return res.status(401).json({
         success: 0,
-        message: "Invalid Token...",
+        message: errorCodes.INVALID_TOKEN,
       });
     }
   },

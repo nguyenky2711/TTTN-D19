@@ -1,4 +1,6 @@
 require('dotenv').config();
+const errorCodes = require('../../errorMessages');
+
 const {
     addProduct,
     getCartByUserId,
@@ -18,7 +20,7 @@ module.exports = {
                 console.error(err);
                 return res.status(500).json({
                     success: 0,
-                    message: "Error parsing form data"
+                    message: errorCodes.FORM_DATA_PARSE_ERROR
                 });
             }
 
@@ -37,7 +39,7 @@ module.exports = {
                 if (isExist) {
                     return res.json({
                         success: 0,
-                        message: "Product already exists in cart."
+                        message: errorCodes.PRODUCT_ALREADY_EXISTS_IN_CART
                     });
                 }
 
@@ -50,7 +52,7 @@ module.exports = {
             } catch (error) {
                 return res.json({
                     success: 0,
-                    message: "Something went wrong."
+                    message: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         });
@@ -66,7 +68,7 @@ module.exports = {
             if (!cart) {
                 return res.json({
                     success: 0,
-                    message: "Record not found",
+                    message: errorCodes.RECORD_NOT_FOUND,
                 });
             }
             let list = []
@@ -78,7 +80,7 @@ module.exports = {
                 list.push(cartDTO)
             }
             for (index in list) {
-                subTotal += (list[index].productDTO.priceDTO[0].price * list[index].quantity)
+                subTotal += (list[index].productDTO.priceDTO[0].discounted_price * list[index].quantity)
             }
 
             const totalPages = Math.ceil(list.length / limit);
@@ -101,7 +103,7 @@ module.exports = {
             console.error(error);
             return res.status(500).json({
                 success: 0,
-                message: "Something went wrong",
+                message: errorCodes.DATABASE_CONNECTION_ERROR,
             });
         }
     },
@@ -113,20 +115,19 @@ module.exports = {
             user_id: user_id
         };
 
-        console.log(data);
 
         try {
             const result = await deleteProduct(data);
 
             return res.json({
                 success: 1,
-                message: "Delete success.",
+                message: errorCodes.DELETE_PROUDCT_FROM_CART_SUCCESS,
                 data: result
             });
         } catch (error) {
             return res.json({
                 success: 0,
-                message: "Something went wrong."
+                message: errorCodes.DATABASE_CONNECTION_ERROR
             });
         }
     },
@@ -138,7 +139,7 @@ module.exports = {
                 console.error(err);
                 return res.status(500).json({
                     success: 0,
-                    message: "Error parsing form data"
+                    message: errorCodes.FORM_DATA_PARSE_ERROR
                 });
             }
 
@@ -149,13 +150,12 @@ module.exports = {
                 product_id: parseInt(body.product_id.toString()),
                 quantity: parseInt(body.quantity.toString())
             }
-            console.log(data)
             try {
 
                 const result = await updateQuantity(data);
                 return res.status(200).json({
                     success: 1,
-                    message: "Update cart successfully",
+                    message: errorCodes.UPDATE_CART_SUCCESSFULLY,
                     data: {
                         result
                     }
@@ -164,7 +164,7 @@ module.exports = {
                 console.error(error);
                 return res.status(500).json({
                     success: 0,
-                    message: "Database connection error"
+                    message: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         });

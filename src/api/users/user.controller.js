@@ -1,4 +1,6 @@
 require('dotenv').config();
+const errorCodes = require('../../errorMessages');
+
 const {
   getUserByUserEmail,
   getUserByUserId,
@@ -25,7 +27,7 @@ module.exports = {
         console.error(err);
         return res.status(500).json({
           success: 0,
-          message: "Error parsing form data"
+          message: errorCodes.FORM_DATA_PARSE_ERROR
         });
       }
 
@@ -45,7 +47,7 @@ module.exports = {
         if (existingUser) {
           return res.status(400).json({
             success: 0,
-            message: "Email already exists. Please use a different email address."
+            message: errorCodes.EMAIL_ALREADY_EXISTS,
           });
         }
         const activeToken = crypto.randomBytes(20).toString('hex');
@@ -59,7 +61,7 @@ module.exports = {
 
         return res.status(200).json({
           success: 1,
-          message: "User created successfully",
+          message: errorCodes.USER_CREATED_SUCCESSFULLY,
           data: {
             userID
           }
@@ -68,7 +70,7 @@ module.exports = {
         console.error(error);
         return res.status(500).json({
           success: 0,
-          message: "Database connection error"
+          message: errorCodes.DATABASE_CONNECTION_ERROR
         });
       }
     });
@@ -81,7 +83,7 @@ module.exports = {
         console.error(err);
         return res.status(500).json({
           success: false,
-          message: "Error parsing form data"
+          message: errorCodes.FORM_DATA_PARSE_ERROR
         });
       }
 
@@ -93,19 +95,19 @@ module.exports = {
         if (!user) {
           return res.status(401).json({
             success: false,
-            message: "Invalid email or password"
+            message: errorCodes.EMAIL_PASSWORD_INVALID,
           });
         }
         if (!user.confirm) {
           return res.status(401).json({
             success: false,
-            message: "Account is not confirmed"
+            message: errorCodes.ACCOUNT_NOT_CONFIRMED
           });
         }
         if (user.status_id == 2)
           return res.status(401).json({
             success: false,
-            message: "Account has been locked"
+            message: errorCodes.ACCOUNT_LOCKED
           });
         const passwordMatch = compareSync(body.password, user.password);
         if (passwordMatch) {
@@ -124,7 +126,7 @@ module.exports = {
           const { password, ...userData } = user; // Exclude password from the response
           return res.status(200).json({
             success: true,
-            message: "Login successful",
+            message: errorCodes.LOGIN_SUCCESSFUL,
             token,
             data: {
               userDTO: userData
@@ -133,14 +135,14 @@ module.exports = {
         } else {
           return res.status(401).json({
             success: false,
-            message: "Invalid email or password"
+            message: errorCodes.EMAIL_PASSWORD_INVALID
           });
         }
       } catch (error) {
         console.error(error);
         return res.status(500).json({
           success: false,
-          message: "Something went wrong"
+          message: errorCodes.DATABASE_CONNECTION_ERROR
         });
       }
     });
@@ -153,14 +155,14 @@ module.exports = {
       if (id != userID) {
         return res.status(403).json({
           success: 0,
-          message: "Access denied. You are not authorized to view this user's data.",
+          message: errorCodes.UNAUTHORIZED_ACCESS,
         });
       }
       const user = await getUserByUserId(id); // Assuming getUserByUserId is an asynchronous function that returns a promise
       if (!user) {
         return res.json({
           success: 0,
-          message: "Record not found",
+          message: errorCodes.RECORD_NOT_FOUND,
         });
       }
       const userDTO = { ...user };
@@ -178,7 +180,7 @@ module.exports = {
       console.error(error);
       return res.status(500).json({
         success: 0,
-        message: "Something went wrong",
+        message: errorCodes.DATABASE_CONNECTION_ERROR,
       });
     }
   },
@@ -190,7 +192,7 @@ module.exports = {
     if (role != 'admin') {
       return res.status(403).json({
         success: 0,
-        message: "Access denied. You are not authorized to get user's data.",
+        message: errorCodes.UNAUTHORIZED_GET_USER_DATA,
       });
     }
     try {
@@ -222,7 +224,7 @@ module.exports = {
     } catch (error) {
       return res.json({
         success: 0,
-        data: 'Something wrong'
+        data: errorCodes.DATABASE_CONNECTION_ERROR
       });
     }
 
@@ -234,7 +236,7 @@ module.exports = {
         console.error(err);
         return res.status(500).json({
           success: 0,
-          message: "Error parsing form data"
+          message: errorCodes.FORM_DATA_PARSE_ERROR
         });
       }
 
@@ -249,7 +251,7 @@ module.exports = {
         if (id != userID) {
           return res.status(403).json({
             success: 0,
-            message: "Access denied. You are not authorized to update this user's data.",
+            message: errorCodes.UNAUTHORIZED_UPDATE_USER_DATA,
           });
         }
         // const salt = genSaltSync(10);
@@ -260,13 +262,13 @@ module.exports = {
 
         return res.json({
           success: 1,
-          message: "Updated successfully"
+          message: errorCodes.UPDATE_USER_SUCCESSFUL
         });
       } catch (error) {
         // console.error(error);
         return res.status(500).json({
           success: 0,
-          message: "Something went wrong"
+          message: errorCodes.DATABASE_CONNECTION_ERROR
         });
       }
     });
@@ -280,7 +282,7 @@ module.exports = {
         console.error(err);
         return res.status(500).json({
           success: 0,
-          message: "Error parsing form data"
+          message: errorCodes.FORM_DATA_PARSE_ERROR
         });
       }
       const role = req.decoded.role;
@@ -290,7 +292,7 @@ module.exports = {
       if (role !== 'admin') {
         return res.status(403).json({
           success: 0,
-          message: "Access Denied"
+          message: errorCodes.ACCESS_DENIED
         });
       }
 
@@ -300,19 +302,19 @@ module.exports = {
         if (!result) {
           return res.status(404).json({
             success: 0,
-            message: "Record Not Found"
+            message: errorCodes.RECORD_NOT_FOUND
           });
         }
 
         return res.status(200).json({
           success: 1,
-          message: "User status changed successfully"
+          message: errorCodes.USER_STATUS_CHANGE_SUCCESSFUL
         });
       } catch (error) {
         console.error(error);
         return res.status(500).json({
           success: 0,
-          message: "Something went wrong"
+          message: errorCodes.DATABASE_CONNECTION_ERROR
         });
       }
     });
