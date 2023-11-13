@@ -68,7 +68,6 @@ module.exports = {
                     data.user_id,
                 ]
             );
-            console.log(rows)
             return rows[0];
         } catch (error) {
             throw error;
@@ -84,7 +83,6 @@ module.exports = {
                     data.user_id,
                 ]
             );
-            console.log(rows);
             return rows.affectedRows; // Use affectedRows to indicate the number of rows updated
         } catch (error) {
             throw error;

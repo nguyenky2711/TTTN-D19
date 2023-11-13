@@ -211,71 +211,49 @@ module.exports = {
       body.type_id = body.type_id.toString();
       body.imagesName = JSON.parse(body.imagesName);
       const imagesName = body.imagesName;
-      const imagesUrl = body.imagesUrl;
+      const imagesUrl = JSON.parse(body.imagesUrl);
+
       let images = [];
-      const existingImages = await getImageByItemId(id)
-      for (const index in imagesName) {
-        let found = false;
-        for (const index2 in existingImages) {
-          if (imagesName[index] === existingImages[index2].name) {
-            found = true;
-            break; // No need to continue searching if found
+      const existingImages = await getImageByItemId(id);
+
+      if (existingImages.length > 0) {
+        for (const existingImage of existingImages) {
+          const found = imagesName.some((name) => existingImage.name === name);
+
+          if (!found) {
+            await deleteImageByName(existingImage.name, id);
           }
         }
 
-        if (!found) {
-          // New image found in imagesName but not in existingImages
-          // You can perform actions such as copying the new image to the server
-          // and updating the database with the new image information
-          const filePath = findFilePathByFileName('C:/Users/Ky/Downloads', imagesName[index]);
+        const currentImages = await getImageByItemId(id);
 
-          if (filePath) {
-            console.log('New image found:', filePath);
-            // Copy the image to the server and update the database
+        for (const name of imagesName) {
+          const found = currentImages.some((image) => image.name === name);
 
-            const tempPath = filePath;
-            const fileName = imagesName[index];
-            const destinationPath = path.join(__dirname, '../../uploads', fileName);
-
-            try {
-              // Check if the temporary file exists before copying it
-              fs.accessSync(tempPath, fs.constants.R_OK);
-
-              // Copy the uploaded file to the destination path
-              fs.copyFileSync(tempPath, destinationPath);
-              // imageNames.push(fileName);
-              // imagePaths.push(destinationPath);
-            } catch (error) {
-              console.error('Error copying file:', error);
-            }
+          if (!found) {
             const temp = {
-              name: imagesName[index],
+              name,
               item_id: id,
-              url: imagesUrl[index]
-            }
-            await createImage(temp)
-            images.push(imagesName[index])
-          } else {
-            console.log('New image not found:', imagesName[index]);
+              url: imagesUrl[imagesName.indexOf(name)],
+            };
+            await createImage(temp);
           }
         }
-      }
-      for (index in existingImages) {
-        let notFound = true
-        for (index2 in imagesName) {
-          if (existingImages[index].name == imagesName[index2]) {
-            notFound = false;
-          }
+      } else {
+        for (const name of imagesName) {
+          const temp = {
+            name,
+            item_id: id,
+            url: imagesUrl[imagesName.indexOf(name)],
+          };
+          await createImage(temp);
         }
-        if (notFound) {
-          await deleteImageByName(existingImages[index].name)
-        }
-        // console.log(notFound)
       }
+
 
       try {
         const test = await getItemByName(body.name)
-        if (test) {
+        if (test && test?.id != id) {
           return res.status(409).json({
             success: 0,
             message: "Item with the same name already exists"
@@ -381,7 +359,6 @@ module.exports = {
         };
 
         newItem_id = await createItem(temp);
-        console.log('id', newItem_id)
         newItem_id && items_id.push(newItem_id)
       }
       //update stock for product

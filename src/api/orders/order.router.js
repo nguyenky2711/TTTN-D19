@@ -14,6 +14,7 @@ const {
     getPaymentById,
     statisticOrdersByTime,
     statisticOrdersByTimeWithItemId,
+    updateReview,
 } = require("./order.controller");
 // router.get("/", getItems);
 router.post("/", checkToken, createOrder);
@@ -23,10 +24,10 @@ router.get("/payment", getPayments);
 router.get("/statistic", checkToken, statisticOrdersByTime);
 router.get("/statistic/:id", checkToken, statisticOrdersByTimeWithItemId);
 router.get("/:id", checkToken, getOrderDetailByUser);
+router.put("/review", checkToken, updateReview);
 router.put("/:id", checkToken, changeStatusOrder);
 // router.get("/discount/:id", getDiscountById);
 router.get("/payment/:id", getPaymentById);
-// router.put("/discount/:id", checkToken, updateDiscount);
 // router.post("/discount/", checkToken, createDiscount);
 
 

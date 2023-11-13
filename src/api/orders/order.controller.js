@@ -1,13 +1,15 @@
 require('dotenv').config();
+const errorCodes = require('../../errorMessages');
+
 const {
-    createTableOrder, createDetailOrder, getOrders, getPaymentById, getDiscountById, getOrderDetailById, getOrdersByUser, getOrderById, changeStatusOrder, getStockById, updateProductStock, returnProductStock, getPayments, getDiscounts, getUserByUserId, updateDiscount, createDiscount
+    createTableOrder, createDetailOrder, getOrders, getPaymentById, getDiscountById, getOrderDetailById, getOrdersByUser, getOrderById, changeStatusOrder, getStockById, updateProductStock, returnProductStock, getPayments, getDiscounts, getUserByUserId, updateDiscount, createDiscount, getReviewById, updateReivew
 } = require("./order.service");
 const formidable = require("formidable");
 const connection = require("../../config/database");
 const moment = require("moment");
-const { getStatusDTO, updateProduct, getItemById, createReviewSlot, getReviews } = require('../items/item.service');
+const { getStatusDTO, updateProduct, getItemById, createReviewSlot, getReviews, getReviewByItemId, getReviewByItemIdUserIdOrderId } = require('../items/item.service');
 const { updateStatusCart, deleteProduct } = require('../carts/cart.service');
-const { getStockByProductId, getProductById, getProductByItemId } = require('../products/product.service');
+const { getStockByProductId, getProductById, getProductByItemId, getProductByIdPriceId } = require('../products/product.service');
 module.exports = {
     createOrder: async (req, res) => {
         const form = new formidable.IncomingForm();
@@ -16,10 +18,11 @@ module.exports = {
                 console.error(err);
                 return res.status(500).json({
                     success: 0,
-                    message: "Error parsing form data"
+                    message: errorCodes.FORM_DATA_PARSE_ERROR
                 });
             }
             const body = fields;
+            console.log(body)
             created_at = moment(new Date()).format('yyyy-MM-DD')
             created_by = req.decoded.userId
             const table = {
@@ -49,12 +52,12 @@ module.exports = {
                     } else if (inventoryItem == undefined) {
                         return res.status(403).json({
                             success: 0,
-                            message: "Product not found in inventory"
+                            message: errorCodes.PRODUCT_NOT_FOUND
                         });
                     } else if (inventoryItem.stock < order_detail[index].quantity) {
                         return res.status(403).json({
                             success: 0,
-                            message: "Ordered quantity exceeds available stock."
+                            message: errorCodes.ORDERED_QUANTITY_EXCEEDS_STOCK
                         });
                     }
 
@@ -66,11 +69,12 @@ module.exports = {
                         product_id: order_detail[index].product_id,
                         order_id: orderId,
                         quantity: order_detail[index].quantity,
-                        sum: order_detail[index].sum
+                        sum: order_detail[index].sum,
+                        price_id: order_detail[index].price_id,
                     }
                     const cart = {
                         product_id: order_detail[index].product_id,
-                        user_id: req.decoded.userId
+                        user_id: req.decoded.userId,
                     }
                     const idDetail = await createDetailOrder(detail)
                     const deleteCartItem = await deleteProduct(cart)
@@ -80,14 +84,14 @@ module.exports = {
 
                 return res.status(200).json({
                     success: 1,
-                    message: "Order created successfully",
+                    message: errorCodes.ORDER_CREATED_SUCCESSFULLY,
 
                 });
             } catch (error) {
                 console.error(error);
                 return res.status(500).json({
                     success: 0,
-                    message: "Database connection error"
+                    message: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         });
@@ -137,7 +141,7 @@ module.exports = {
             } catch (error) {
                 return res.json({
                     success: 0,
-                    data: 'Something wrong'
+                    data: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         } else {
@@ -193,7 +197,7 @@ module.exports = {
             } catch (error) {
                 return res.json({
                     success: 0,
-                    data: 'Something wrong'
+                    data: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         }
@@ -238,11 +242,12 @@ module.exports = {
         } catch (error) {
             return res.json({
                 success: 0,
-                data: 'Something wrong'
+                data: errorCodes.DATABASE_CONNECTION_ERROR
             });
         }
     },
     getOrderDetailByUser: async (req, res) => {
+
         const userId = req.decoded.userId
         const role = req.decoded.role
         const orderId = req.params.id
@@ -252,26 +257,34 @@ module.exports = {
         // console.log(orderData)
         // console.log(userId)
         if (orderData?.created_by != userId && role != 'admin') {
-            return res.status(403).json({ error: "Unauthorized to perform this action." });
+            return res.status(403).json({ error: "Unauthorized to perform this action.", message: errorCodes.ACCESS_DENIED });
         }
         try {
             const result = await getOrderDetailById(orderId);
             let newResult = []
             if (role != 'admin') {
                 for (index in result) {
-                    const { order_id, product_id, ...resultData } = result[index];
-                    const productData = await getProductById(product_id);
+                    const { order_id, product_id, price_id, ...resultData } = result[index];
+                    const productData = await getProductByIdPriceId(product_id, price_id);
                     const { stockDTO, ...productDTO } = productData;
+
+                    const review = await getReviewByItemIdUserIdOrderId({
+                        item_id: productData.itemDTO.data.id,
+                        order_id: parseInt(orderId),
+                        created_by: userId,
+                    })
+                    console.log(review)
                     const tempObject = {
                         ...resultData,
                         productDTO: productDTO,
+                        reviewed: review?.reviewed ? true : false
                     }
                     newResult.push(tempObject);
                 }
             } else {
                 for (index in result) {
-                    const { order_id, product_id, ...resultData } = result[index];
-                    const productDTO = await getProductById(product_id);
+                    const { order_id, product_id, price_id, ...resultData } = result[index];
+                    const productDTO = await getProductByIdPriceId(product_id, price_id);
                     const tempObject = {
                         ...resultData,
                         productDTO: productDTO,
@@ -304,7 +317,7 @@ module.exports = {
         } catch (error) {
             return res.json({
                 success: 0,
-                data: 'Something wrong'
+                data: errorCodes.DATABASE_CONNECTION_ERROR
             });
         }
     },
@@ -314,13 +327,12 @@ module.exports = {
             const userId = req.decoded.userId;
             const orderId = req.params.id;
             const order = await getOrderById(orderId);
-            console.log(order)
-            const statusId = req.query.status_id;
+            const statusId = parseInt(req.query.status_id);
 
             if (role !== 'admin' && userId != order.created_by) {
                 return res.status(403).json({
                     success: 0,
-                    message: "Access Denied"
+                    message: errorCodes.ACCESS_DENIED
                 });
             }
 
@@ -342,30 +354,27 @@ module.exports = {
             // add review slot
             if (result !== undefined && statusId === 9) {
                 // Define an async function to use 'await'
-                async function processOrderDetail() {
-                    const uniqueProducts = [];
+                const uniqueProducts = [];
+                for (let i in order_detail) {
+                    const product = await getProductById(order_detail[i].product_id);
+                    console.log(product)
+                    const existingProduct = uniqueProducts.find((r) => r.itemDTO.data.id === product.itemDTO.data.id);
 
-                    await Promise.all(order_detail.map(async (item) => {
-                        const product = await getProductById(item.product_id);
-                        const existingProduct = uniqueProducts.find((r) => r.item_id === product.item_id);
-
-                        if (!existingProduct) {
-                            uniqueProducts.push(product);
-                        }
-                    }));
-
-                    return uniqueProducts;
+                    if (!existingProduct) {
+                        uniqueProducts.push(product);
+                    }
                 }
 
                 // Call the async function and await the result
-                const reviews = await getReviews()
-                const uniqueProducts = await processOrderDetail();
                 for (const uniqueProduct of uniqueProducts) {
+                    const reviews = await getReviews()
+
                     const sendData = {
                         created_by: order.created_by,
                         modifield_time: moment().format('YYYY-MM-DD HH:mm:ss'),
-                        id: reviews.length,
-                        item_id: uniqueProduct.item_id,
+                        id: reviews.length + 1,
+                        item_id: uniqueProduct.itemDTO.data.id,
+                        order_id: orderId,
                     }
                     await createReviewSlot(sendData)
                 }
@@ -376,7 +385,7 @@ module.exports = {
 
             res.json({
                 success: 1,
-                message: "Status updated successfully"
+                message: errorCodes.STATUS_UPDATED_SUCCESSFULLY
             });
 
         } catch (error) {
@@ -384,7 +393,7 @@ module.exports = {
             console.error(error);
             res.status(500).json({
                 success: 0,
-                message: "Internal server error"
+                message: errorCodes.DATABASE_CONNECTION_ERROR
             });
         }
     },
@@ -397,7 +406,7 @@ module.exports = {
         } catch (error) {
             // Handle any errors that occurred during fetching payments
             console.error('Error fetching payments:', error);
-            res.status(500).json({ success: 0, error: 'Failed to get payments' });
+            res.status(500).json({ success: 0, error: 'Failed to get payments', message: errorCodes.RECORD_NOT_FOUND });
         }
     },
     getPaymentById: async (req, res) => {
@@ -416,7 +425,7 @@ module.exports = {
         } catch (error) {
             // Handle any errors that occurred during fetching payments
             console.error('Error fetching payments:', error);
-            return res.status(500).json({ success: 0, error: 'Failed to get payments' });
+            return res.status(500).json({ success: 0, error: 'Failed to get payments', message: errorCodes.RECORD_NOT_FOUND });
         }
     },
 
@@ -444,7 +453,7 @@ module.exports = {
                 } catch (error) {
                     return res.json({
                         success: 0,
-                        data: 'Something wrong'
+                        data: errorCodes.DATABASE_CONNECTION_ERROR
                     });
                 }
             } else if (month != undefined && month != '') {
@@ -477,7 +486,7 @@ module.exports = {
                 } catch (error) {
                     return res.json({
                         success: 0,
-                        data: 'Something wrong'
+                        data: errorCodes.DATABASE_CONNECTION_ERROR
                     });
                 }
             }
@@ -528,7 +537,7 @@ module.exports = {
                 } catch (error) {
                     return res.json({
                         success: 0,
-                        data: 'Something wrong'
+                        data: errorCodes.DATABASE_CONNECTION_ERROR
                     });
                 }
             } else if (month != undefined && month != '') {
@@ -577,12 +586,60 @@ module.exports = {
                 } catch (error) {
                     return res.json({
                         success: 0,
-                        data: 'Something wrong'
+                        data: errorCodes.DATABASE_CONNECTION_ERROR
                     });
                 }
             }
         }
 
 
+    },
+    updateReview: async (req, res) => {
+        const form = new formidable.IncomingForm();
+        form.parse(req, async (err, fields, files) => {
+            if (err) {
+                console.error(err);
+                return res.status(500).json({
+                    success: 0,
+                    message: "Error parsing form data"
+                });
+            }
+            const body = fields;
+            const userId = req.decoded.userId;
+            body.rating = Number(body.rating.toString())
+            body.item_id = Number(body.item_id.toString())
+            body.text = body.text.toString()
+            body.imageUrl = body.imageUrl.toString()
+
+            try {
+                // Assuming updateReivew is an asynchronous function that updates a review
+                const result = await updateReivew({
+                    ...body,
+                    created_by: userId,
+                    modifield_time: moment().format('YYYY-MM-DD HH:mm:ss'),
+                });
+                // Check if the update was successful
+                if (result) {
+                    return res.status(200).json({
+                        success: 1,
+                        message: "Review updated successfully",
+                    });
+                } else {
+                    // If updateReivew returns a falsy value on failure, you can handle it here.
+                    return res.status(400).json({
+                        success: 0,
+                        message: "Review update failed",
+                    });
+                }
+            } catch (error) {
+                // Log any unexpected errors, like database connection issues
+                console.error(error);
+                return res.status(500).json({
+                    success: 0,
+                    message: "Database connection error",
+                });
+            }
+
+        });
     },
 };

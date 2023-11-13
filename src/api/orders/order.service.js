@@ -2,10 +2,11 @@ const { CLIENT_COMPRESS } = require("mysql/lib/protocol/constants/client");
 const connection = require("../../config/database");
 module.exports = {
     createTableOrder: async (data) => {
+        console.log(data)
         try {
             const [rows, fields] = await connection.execute(
                 `INSERT INTO Orders (created_at, created_by, payment_id, total,  status_id, receiver_name, receiver_phone, receiver_address)
-          VALUES (?, ?, ?, ?, ?, ?,?,?,?)`,
+          VALUES (?, ?, ?, ?, ?, ?,?,?)`,
                 [
                     data.created_at,
                     data.created_by,
@@ -31,13 +32,14 @@ module.exports = {
     createDetailOrder: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `INSERT INTO OrderDetail (product_id, order_id, quantity, sum)
-          VALUES (?, ?, ?, ?)`,
+                `INSERT INTO OrderDetail (product_id, order_id, quantity, sum,price_id)
+          VALUES (?, ?, ?, ?,?)`,
                 [
                     data.product_id,
                     data.order_id,
                     data.quantity,
                     data.sum,
+                    data.price_id,
                 ]
             );
             // Check if the insert operation was successful
@@ -82,6 +84,7 @@ module.exports = {
         }
     },
     getPaymentById: async (id) => {
+
         try {
             const [rows, fields] = await connection.execute(
                 `SELECT * FROM Payments WHERE id = ?`,
@@ -108,7 +111,7 @@ module.exports = {
     getOrderDetailById: async (id) => {
         try {
             const [rows, fields] = await connection.execute(
-                `SELECT *  FROM OrderDetail where order_id=?`,
+                `SELECT * FROM OrderDetail where order_id=?`,
                 [
                     id
                 ]
@@ -211,6 +214,37 @@ module.exports = {
             );
 
             return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    getReviewById: async (id) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Review WHERE id = ?`,
+                [id]
+            );
+
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
+    updateReivew: async (data) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `update Review set rating=?, text=?, imageUrl=?, modifield_time=?, reviewed=? where item_id=? and created_by=?`,
+                [
+                    data.rating,
+                    data.text != 'null' ? data.text : null,
+                    data.imageUrl,
+                    data.modifield_time,
+                    1,
+                    data.item_id,
+                    data.created_by,
+                ]);
+
+            return rows;
         } catch (error) {
             throw error;
         }

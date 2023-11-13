@@ -1,4 +1,5 @@
 require('dotenv').config();
+const errorCodes = require('../../errorMessages');
 const { confirmUser, getUserByConfirmationToken, createUser, getUserByUserEmail, changePassword, updateResetToken, resetPassword, getUserByResetToken, getUserByUserId } = require("./account.service");
 const { hashSync, genSaltSync, compareSync } = require("bcrypt");
 const { sign, verify } = require("jsonwebtoken");
@@ -29,14 +30,14 @@ module.exports = {
                 } else {
                     return res.status(400).json({
                         success: false,
-                        message: "The confirmation token is invalid or has expired."
+                        message: errorCodes.INVALID_OR_EXPIRED_CONFIRMATION_TOKEN
                     });
 
                 }
             } else {
                 return res.status(400).json({
                     success: false,
-                    message: "The confirmation token is invalid or has expired."
+                    message: errorCodes.INVALID_OR_EXPIRED_CONFIRMATION_TOKEN
                 });
 
             }
@@ -44,7 +45,7 @@ module.exports = {
             console.error(error);
             return res.status(500).json({
                 success: 0,
-                message: "Database connection error"
+                message: errorCodes.DATABASE_CONNECTION_ERROR
             });
         }
     },
@@ -82,7 +83,7 @@ module.exports = {
                 console.error(err);
                 return res.status(500).json({
                     success: 0,
-                    message: "Error parsing form data"
+                    message: errorCodes.FORM_DATA_PARSE_ERROR
                 });
             }
 
@@ -102,7 +103,7 @@ module.exports = {
                 if (existingUser) {
                     return res.status(400).json({
                         success: 0,
-                        message: "Email already exists. Please use a different email address."
+                        message: errorCodes.EMAIL_ALREADY_EXISTS
                     });
                 }
                 const activeToken = crypto.randomBytes(20).toString('hex');
@@ -116,7 +117,7 @@ module.exports = {
 
                 return res.status(200).json({
                     success: 1,
-                    message: "User created successfully",
+                    message: errorCodes.USER_CREATED_SUCCESSFULLY,
                     data: {
                         userID
                     }
@@ -125,7 +126,7 @@ module.exports = {
                 console.error(error);
                 return res.status(500).json({
                     success: 0,
-                    message: "Database connection error"
+                    message: errorCodes.DATABASE_CONNECTION_ERROR
                 });
             }
         });
@@ -138,7 +139,7 @@ module.exports = {
                 console.error(err);
                 return res.status(500).json({
                     success: false,
-                    message: "Error parsing form data"
+                    message: errorCodes.FORM_DATA_PARSE_ERROR
                 });
             }
 
@@ -150,19 +151,19 @@ module.exports = {
                 if (!user) {
                     return res.status(401).json({
                         success: false,
-                        message: "Invalid email or password"
+                        message: errorCodes.EMAIL_PASSWORD_INVALID
                     });
                 }
                 if (!user.confirm) {
                     return res.status(401).json({
                         success: false,
-                        message: "Account is not confirmed"
+                        message: errorCodes.ACCOUNT_NOT_CONFIRMED
                     });
                 }
                 if (user.status_id == 2) {
                     return res.status(401).json({
                         success: false,
-                        message: "Your account has been locked"
+                        message: errorCodes.YOUR_ACCOUNT_LOCKED,
                     });
                 }
                 const passwordMatch = compareSync(body.password, user.password);
@@ -221,7 +222,6 @@ module.exports = {
             }
 
             const body = fields;
-            console.log(body)
             const userId = req.decoded.userId
             try {
                 const user = await getUserByUserId(userId);
@@ -337,13 +337,13 @@ module.exports = {
                 const user = await getUserByResetToken(body.resetToken[0]);
                 if (!user) {
                     return res.status(404).json({
-                        success: false,
+                        success: 0,
                         message: "User not found"
                     });
                 }
                 if (!user.confirm) {
                     return res.status(401).json({
-                        success: false,
+                        success: 0,
                         message: "Account is not confirmed"
                     });
                 }

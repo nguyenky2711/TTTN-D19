@@ -129,7 +129,6 @@ module.exports = {
         }
     },
     changePassword: async (data) => {
-        console.log(data)
         try {
             const [rows, fields] = await connection.execute(
                 `update Users set  password=? where id = ?`,
@@ -146,7 +145,6 @@ module.exports = {
         }
     },
     updateResetToken: async (data) => {
-        console.log(data)
         try {
             const [rows, fields] = await connection.execute(
                 `update Users set  resetToken=? , resetExpiration =? where email = ?`,

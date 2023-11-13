@@ -32,6 +32,18 @@ module.exports = {
             throw error;
         }
     },
+    getSizeByInfor: async (info_size) => {
+        try {
+            const [rows, fields] = await connection.execute(
+                `SELECT * FROM Sizes WHERE info_size = ?`,
+                [info_size]
+            );
+
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
 
     getSizes: async () => {
         const [rows, fields] = await connection.execute('SELECT * FROM Sizes');

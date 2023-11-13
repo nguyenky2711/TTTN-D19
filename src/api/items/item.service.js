@@ -362,11 +362,11 @@ module.exports = {
             throw error;
         }
     },
-    deleteImageByName: async (name) => {
+    deleteImageByName: async (name, item_id) => {
         try {
             const [rows, fields] = await connection.execute(
-                `DELETE  FROM Images WHERE name = ?`,
-                [name]
+                `DELETE  FROM Images WHERE name = ? and item_id=?`,
+                [name, item_id]
             );
 
             return rows;
@@ -412,7 +412,7 @@ module.exports = {
         try {
             const [rows, fields] = await connection.execute(
                 `SELECT * FROM Review`,
-                [item_id]
+
             );
 
             return rows;
@@ -444,10 +444,27 @@ module.exports = {
             throw error;
         }
     },
+    getReviewByItemIdUserIdOrderId: async (data) => {
+        try {
+            console.log(data)
+
+            const [rows, fields] = await connection.execute(
+                `SELECT reviewed FROM Review  WHERE item_id=? AND order_id=? AND created_by=? `,
+                [
+                    data.item_id,
+                    data.order_id,
+                    data.created_by,
+                ]
+            );
+            return rows[0];
+        } catch (error) {
+            throw error;
+        }
+    },
     createReviewSlot: async (data) => {
         try {
             const [rows, fields] = await connection.execute(
-                `INSERT INTO Review (id, item_id, created_by, rating, text, modifield_time, like, dislike, purchased)
+                `INSERT INTO Review (id, item_id, created_by, rating, text, modifield_time, imageUrl, reviewed,order_id)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     data.id,
@@ -456,10 +473,9 @@ module.exports = {
                     null,
                     null,
                     data.modifield_time,
+                    null,
                     0,
-                    0,
-                    1,
-
+                    data.order_id,
                 ]
             );
             // Check if the insert operation was successful
